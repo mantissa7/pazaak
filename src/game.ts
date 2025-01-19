@@ -254,6 +254,7 @@ class Pazaak {
 
 	async endTurn() {
 		this.#game.turn = Turn.Opponent;
+		this.socket.next(this.#game);
 
 		if (this.#game.opponent.state === PlayState.Play) {
 			console.log("ai turn");
