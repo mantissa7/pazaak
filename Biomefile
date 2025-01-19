@@ -1,0 +1,6 @@
+{
+  "name": "pazaak",
+  "files": {
+    "ignore": ["src/*.vue"]
+  }
+}

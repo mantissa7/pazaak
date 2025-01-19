@@ -1,63 +1,29 @@
 <script setup lang="ts">
-  import { roll } from '@/utils/dice';
+  import { pazaak, Turn, type Game } from '@/game';
+  import CardUI from '@/components/Card.vue';
+  import { ref, toRaw } from 'vue';
 
-  type Card = {
-    value: number;
-    name: string;
-  }
+  const game = ref<Game>();
 
-  enum Turn {
-    Player = 0,
-    Opponent = 1,
-  }
-
-  type Game = {
-    turn: Turn,
-    player: {
-      score: number;
-      grid: Card[],
-      hand: Card[],
-    },
-    opponent: {
-      score: number;
-      grid: Card[],
-      hand: Card[],
-    },
-  }
-
-  const draw = () => {
-    return roll(1, 10);
-  }
-
-  const endTurn = () => {
-    // draw()
-  }
-
-  const stand = () => {
-    // draw()
-  }
-
-  const deck: Card[] = new Array(8).fill(0).map(card => {
-    const val = roll(1, 5);
-    return {
-      value: val,
-      name: `+${val}`,
-    };
+  pazaak.begin((_game) => {
+    console.log(_game)
+    game.value = structuredClone(_game);
   });
 
-  const game: Game = {
-    turn: Turn.Player,
-    player: {
-      score: 0,
-      grid: [{ value: 1, name: '+1' }],
-      hand: deck.slice(0, 4),
-    },
-    opponent: {
-      score: 0,
-      grid: [],
-      hand: deck.slice(4),
-    },
+
+
+  const handleEndTurn = async () => {
+    if (game.value?.turn === Turn.Player) {
+      pazaak.endTurn();
+    }
   }
+
+  const handleStand = () => {
+    if (game.value?.turn === Turn.Player) {
+      pazaak.stand();
+    }
+  }
+
 </script>
 
 <template>
@@ -65,12 +31,18 @@
     <h1>PAZAAK</h1>
 
     <div class="meta">
-      <div class="turn"></div>
-      <div class="username">user 1</div>
-      <div class="score">10</div>
-      <div class="score">12</div>
-      <div class="username">user 2</div>
-      <div class="turn"></div>
+      <div
+        class="turn"
+        :class="{ active: game?.turn === Turn.Player }"
+      ></div>
+      <div class="username">Player</div>
+      <div class="score">{{ pazaak.gridSum(game?.player.grid ?? []) }}</div>
+      <div class="score">{{ pazaak.gridSum(game?.opponent.grid ?? []) }}</div>
+      <div class="username">{{ game?.opponent.username }}</div>
+      <div
+        class="turn"
+        :class="{ active: game?.turn === Turn.Opponent }"
+      ></div>
     </div>
 
     <div class="game">
@@ -80,19 +52,26 @@
             v-for="(_, idx) in new Array(9).fill(0).map(card => null)"
             class="slot"
           >
-            <div v-if="game.player.grid[idx]" class="card">
-              {{ game.player.grid[idx].value }}
-            </div>
+            <CardUI
+              v-if="game?.player.grid[idx]"
+              :value="game?.player.grid[idx].value"
+              :name="game?.player.grid[idx].name"
+              :type="game?.player.grid[idx].type"
+            />
           </div>
         </div>
         <div class="hand">
           <div
-            v-for="card in game.player.hand"
+            v-for="(card, i) in game?.player.hand"
             class="slot"
+            :class="{ played: card.played === true }"
+            @click="() => pazaak.playHand(toRaw(card), i)"
           >
-            <div class="card">
-              {{ card.name }}
-            </div>
+            <CardUI
+              :value="card.value"
+              :name="card.name"
+              :type="card.type"
+            />
           </div>
         </div>
       </div>
@@ -102,15 +81,23 @@
             v-for="(_, idx) in new Array(9).fill(0).map(card => null)"
             class="slot"
           >
-            <!-- {{ card.value }} -->
+            <CardUI
+              v-if="game?.opponent.grid[idx]"
+              :value="game?.opponent.grid[idx].value"
+              :name="game?.opponent.grid[idx].name"
+              :type="game?.opponent.grid[idx].type"
+            />
           </div>
         </div>
         <div class="hand">
           <div
-            v-for="card in game.opponent.hand"
+            v-for="card in game?.opponent.hand"
             class="slot"
           >
-            <div class="card backface">
+            <div
+              class="card backface"
+              :class="{ played: card.played }"
+            >
 
             </div>
           </div>
@@ -120,17 +107,17 @@
     <div class="commands">
       <button
         class="turn"
-        @click="endTurn"
+        @click="handleEndTurn"
       >End Turn</button>
       <button
         class="stand"
-        @click="stand"
+        @click="handleStand"
       >Stand</button>
     </div>
   </main>
 </template>
 
-<style>
+<style scoped>
   .meta {
     display: grid;
     gap: 20px;
@@ -139,6 +126,18 @@
     background: #aaa3;
     height: 40px;
     margin-bottom: 16px;
+
+    .turn {
+      width: 30px;
+      background: red;
+      aspect-ratio: 1 / 1;
+      border-radius: 30px;
+      opacity: 0.2;
+
+      &.active {
+        opacity: 1;
+      }
+    }
 
     .score {
       background: #000;
@@ -168,12 +167,10 @@
 
         .slot {
           display: grid;
-          place-items: center;
           aspect-ratio: var(--card-ratio);
           border-radius: 8px;
           border: 1px solid #666;
           min-width: 100px;
-
         }
       }
 
@@ -192,14 +189,10 @@
           border: 1px solid #666;
           min-width: 100px;
 
-          .card {
-            display: grid;
-            place-items: center;
-            background-color: #333;
-
-            &.backface {
-              background: #222;
-            }
+          &.played {
+            opacity: 0.3;
+            cursor: not-allowed;
+            pointer-events: none;
           }
         }
       }
@@ -222,6 +215,7 @@
       color: #fff;
       padding: 10px 20px;
       border-radius: 8px;
+      cursor: pointer;
     }
   }
 </style>

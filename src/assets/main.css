@@ -27,3 +27,8 @@ body {
   padding: 2rem;
   font-weight: normal;
 }
+
+header {
+  opacity: 0;
+  pointer-events: none;
+}
